@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexTask - Personel Yönetim Sistemi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Lucide Icons (via CDN wrapper or simple SVGs) - Using Phosphor Icons for ease -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Views will be injected here via JavaScript -->
+        <div class="loading_screen">
+            <div class="spinner"></div>
+            <p>Sistem Yükleniyor...</p>
+        </div>
+    </div>
+
+    <!-- Templates for Dynamic Content -->
+    <template id="login-template">
+        <div class="auth-container">
+            <div class="auth-box glass-panel">
+                <div class="auth-header">
+                    <h2>NexTask</h2>
+                    <p>Giriş Yapın</p>
+                </div>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>Kullanıcı Adı</label>
+                        <input type="text" id="username" placeholder="örn. admin" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Şifre</label>
+                        <input type="password" id="password" placeholder="••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Giriş Yap</button>
+                </form>
+            </div>
+        </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>
