@@ -126,23 +126,37 @@ const GoogleSheetService = {
             if (statusEl) statusEl.style.background = 'var(--warning)'; // Loading
 
             console.log('Fetching from Cloud...');
-            const response = await fetch(CONSTANTS.API_URL);
-            if (!response.ok) throw new Error('Cloud response not ok');
-            const data = await response.json();
-            console.log('Cloud Data:', data);
 
-            if (statusEl) {
-                statusEl.style.background = 'var(--success)';
-                statusEl.title = 'Çevrimiçi (Senkronize)';
+            // Timeout after 5 seconds
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            try {
+                const response = await fetch(CONSTANTS.API_URL, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error('Cloud response not ok');
+                const data = await response.json();
+                console.log('Cloud Data:', data);
+
+                if (statusEl) {
+                    statusEl.style.background = 'var(--success)';
+                    statusEl.title = 'Çevrimiçi (Senkronize)';
+                }
+                return data;
+            } catch (fetchErr) {
+                if (fetchErr.name === 'AbortError') throw new Error('Request Timed Out');
+                throw fetchErr;
             }
-            return data;
+
         } catch (error) {
             console.error('Cloud Load Failed:', error);
             const statusEl = document.getElementById('connection-status');
             if (statusEl) {
                 statusEl.style.background = 'var(--danger)';
-                statusEl.title = 'Çevrimdışı (Hata)';
+                statusEl.title = 'Çevrimdışı (Hata: ' + error.message + ')';
             }
+            // Do not alert, just return null so app can start offline
             return null;
         }
     },
@@ -1308,5 +1322,17 @@ class Application {
 }
 
 // Initialize
+// Initialize
+window.onerror = function (msg, url, line, col, error) {
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed; top:0; left:0; right:0; background:red; color:white; padding:20px; z-index:9999; font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    div.innerHTML = '<strong>Hata Oluştu:</strong> ' + msg + '<br><small>' + url + ':' + line + '</small><br><button onclick="this.parentElement.remove()" style="margin-top:10px; padding:5px 10px; color:black;">Kapat</button>';
+    document.body.appendChild(div);
+    return false;
+};
+
 window.App = new Application();
-window.App.init();
+window.App.init().catch(err => {
+    console.error("Critical Init Error:", err);
+    alert("Sistem başlatılırken kritik bir hata oluştu: " + err.message);
+});
