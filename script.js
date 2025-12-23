@@ -311,6 +311,7 @@ class ViewManager {
                         <li onclick="App.navigate('reports')">
                             <i class="ph ph-chart-line-up"></i> <span>Raporlar</span>
                         </li>
+                        ` : ''}
                         <li onclick="App.sync()">
                             <i class="ph ph-arrows-clockwise"></i> <span>Verileri Yenile</span>
                         </li>
