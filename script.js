@@ -188,7 +188,7 @@ class ViewManager {
                 <nav class="sidebar glass-panel">
                     <div class="brand">
                         <div class="brand-icon"><i class="ph ph-hexagon-fill"></i></div>
-                        <h3>NexTask</h3>
+                        <h3>İş Takibi</h3>
                     </div>
                     
                     <ul class="nav-links">
