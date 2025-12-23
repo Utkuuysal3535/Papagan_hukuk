@@ -236,15 +236,35 @@ class Store {
     async init() {
         const cloudData = await GoogleSheetService.load();
         if (cloudData && !Array.isArray(cloudData)) {
+            // Check for new tasks to notify current user
+            if (this.currentUser && cloudData.tasks) {
+                const localTasks = this.getTasks();
+                const newTasksForMe = cloudData.tasks.filter(cloudTask =>
+                    cloudTask.assigneeId === this.currentUser.id &&
+                    !localTasks.find(localTask => localTask.id === cloudTask.id)
+                );
+
+                if (newTasksForMe.length > 0) {
+                    Utils.playSound();
+                    // Optional: Show a small toast or just count on badge
+                    console.log("New tasks detected!", newTasksForMe);
+                }
+            }
+
             // Assume object { users: [], tasks: [] }
-            if (cloudData.users) localStorage.setItem('nex_users', JSON.stringify(cloudData.users));
-            if (cloudData.tasks) localStorage.setItem('nex_tasks', JSON.stringify(cloudData.tasks));
-            // We ignore notifications for cloud sync usually, or sync them too if needed.
+            const tasksChanged = JSON.stringify(cloudData.tasks) !== localStorage.getItem('nex_tasks');
+            const usersChanged = JSON.stringify(cloudData.users) !== localStorage.getItem('nex_users');
+
+            if (usersChanged && cloudData.users) localStorage.setItem('nex_users', JSON.stringify(cloudData.users));
+            if (tasksChanged && cloudData.tasks) localStorage.setItem('nex_tasks', JSON.stringify(cloudData.tasks));
+
+            return { tasksChanged, usersChanged };
         } else if (Array.isArray(cloudData) && cloudData.length === 0) {
             // First time or empty
             console.log('Cloud is empty, pushing local data...');
             this.syncToCloud();
         }
+        return { tasksChanged: false, usersChanged: false };
     }
 
     syncToCloud() {
@@ -365,6 +385,7 @@ class ViewManager {
     }
 
     updateView(viewName, params = {}) {
+        this.currentView = { name: viewName, params }; // Save state for refresh
         const contentEl = document.getElementById('view-content');
         const titleEl = document.getElementById('page-title');
 
@@ -384,6 +405,12 @@ class ViewManager {
         } else if (viewName === 'reports') {
             titleEl.textContent = 'Performans Raporları';
             contentEl.innerHTML = this.getReportsViewHTML(params);
+        }
+    }
+
+    refreshCurrentView() {
+        if (this.currentView) {
+            this.updateView(this.currentView.name, this.currentView.params);
         }
     }
 
@@ -733,8 +760,15 @@ class Application {
         this.checkRecurringTasks();
         this.checkAuth();
 
-        // Real-time Sync Listener
+        // Real-time Sync Listener (Local Storage)
         window.addEventListener('storage', (e) => this.handleStorageChange(e));
+
+        // Auto-Sync Polling (5 seconds)
+        setInterval(() => {
+            if (this.store.currentUser) {
+                this.sync(true); // Silent sync
+            }
+        }, 5000);
     }
 
     handleStorageChange(e) {
@@ -818,15 +852,26 @@ class Application {
         }
     }
 
-    async sync() {
-        const statusEl = document.getElementById('connection-status');
-        if (statusEl) {
-            statusEl.style.background = 'var(--warning)';
-            statusEl.title = 'Senkronize ediliyor...';
+    async sync(isSilent = false) {
+        if (!isSilent) {
+            const statusEl = document.getElementById('connection-status');
+            if (statusEl) {
+                statusEl.style.background = 'var(--warning)';
+                statusEl.title = 'Senkronize ediliyor...';
+            }
         }
 
-        await this.store.init();
-        this.navigate('home'); // Refresh current view
+        const result = await this.store.init();
+
+        // Only re-navigate/re-render if something actually changed and we are logged in
+        if (result.tasksChanged || result.usersChanged) {
+            if (this.store.currentUser) {
+                const currentView = document.getElementById('page-title')?.textContent;
+                // Map title back to view name or just refresh current
+                // For simplicity, we just refresh the view-content without full navigate if we can
+                this.view.refreshCurrentView();
+            }
+        }
     }
 
     handleLogout() {
