@@ -120,7 +120,7 @@ const Utils = {
 };
 
 const CONSTANTS = {
-    API_URL: 'https://script.google.com/macros/s/AKfycbyfB3PSj2ZLBlm3wofSJrjX2dSzAUudP-PlO7raAt3qQleP4yAvxyys2zku2eyNs9yT/exec'
+    API_URL: 'https://script.google.com/macros/s/AKfycbzE1Igd4Jv370CLsXhEsO8bKjViK2Yj6h3husMzREeyxKoC-kM0irUWZVqEGBtC0zc/exec'
 };
 
 const GoogleSheetService = {
