@@ -485,7 +485,13 @@ class ViewManager {
 
         // Helpers
         const getElapsed = (task) => {
-            if (task.status === 'completed' || task.status === 'cancelled') return '-';
+            if (task.status === 'cancelled') return '-';
+            if (task.status === 'completed') {
+                const mins = parseInt(task.workDuration || 0);
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                return `${h}s ${m}dk`;
+            }
             const start = new Date(task.assignedAt || task.createdAt);
             const now = new Date();
             const diffMs = now - start;
@@ -501,8 +507,9 @@ class ViewManager {
 
             // Elapsed Time Badge
             let elapsedBadge = '';
-            if (!isCompleted && t.status !== 'cancelled') {
-                elapsedBadge = `<span class="badge" style="background:rgba(255,255,255,0.1); border:1px solid var(--glass-border);">Geçen: ${getElapsed(t)}</span>`;
+            if (t.status !== 'cancelled') {
+                const label = isCompleted ? 'Tamamlanan' : 'Geçen';
+                elapsedBadge = `<span class="badge" style="background:rgba(255,255,255,0.1); border:1px solid var(--glass-border);">${label}: ${getElapsed(t)}</span>`;
             }
 
             return `
