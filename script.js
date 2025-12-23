@@ -1,5 +1,5 @@
 /**
- * NexTask Application Logic - Bulut Senkronizasyonlu Versiyon
+ * NexTask Application Logic - Gelişmiş Bulut Senkronizasyonlu Versiyon
  */
 
 // --- UTILS ---
@@ -23,8 +23,8 @@ const Utils = {
             const tasks = [
                 {
                     id: 'task_1',
-                    title: 'Sisteme Hoş Geldiniz',
-                    description: 'Bulut senkronizasyonu aktif.',
+                    title: 'İlk Görev',
+                    description: 'Sisteme hoş geldiniz.',
                     assigneeId: empId,
                     creatorId: adminId,
                     status: 'pending',
@@ -34,7 +34,7 @@ const Utils = {
                     parentTaskId: null,
                     estimatedDuration: '120',
                     assignedAt: new Date().toISOString(),
-                    notes: []
+                    notes: [{ userId: adminId, text: 'Hoşgeldin mesajı.', time: new Date().toISOString() }]
                 }
             ];
 
@@ -89,7 +89,7 @@ class Store {
     }
 }
 
-// --- VIEW MANAGER ---
+// --- VIEW MANAGER (TAM VERSİYON) ---
 class ViewManager {
     constructor(appId) {
         this.appEl = document.getElementById(appId);
@@ -134,7 +134,7 @@ class ViewManager {
                     <header class="top-bar glass-panel">
                         <h2 id="page-title">Genel Bakış</h2>
                         <div style="display:flex; gap:10px;">
-                            <button onclick="App.syncWithCloud()" class="btn btn-outline" title="Verileri Güncelle"><i class="ph ph-arrows-clockwise"></i> Yenile</button>
+                            <button onclick="App.syncWithCloud()" class="btn btn-outline"><i class="ph ph-arrows-clockwise"></i> Yenile</button>
                             <button onclick="App.openCreateTaskModal()" class="btn btn-primary"><i class="ph ph-plus"></i> Yeni Görev</button>
                         </div>
                     </header>
@@ -148,10 +148,16 @@ class ViewManager {
 
     updateView(viewName) {
         const contentEl = document.getElementById('view-content');
+        const titleEl = document.getElementById('page-title');
         if (!contentEl) return;
-        if (viewName === 'home') contentEl.innerHTML = this.getHomeHTML();
-        else if (viewName === 'tasks') contentEl.innerHTML = this.getTasksHTML();
-        else if (viewName === 'team') contentEl.innerHTML = this.getTeamHTML();
+
+        if (viewName === 'home') {
+            titleEl.textContent = 'Genel Bakış';
+            contentEl.innerHTML = this.getHomeHTML();
+        } else if (viewName === 'tasks') {
+            titleEl.textContent = 'Görev Yönetimi';
+            contentEl.innerHTML = this.getTasksHTML();
+        }
     }
 
     getHomeHTML() {
@@ -173,21 +179,16 @@ class ViewManager {
                 <td><button onclick="App.deleteTask('${t.id}')" class="btn-icon"><i class="ph ph-trash"></i></button></td>
             </tr>
         `).join('');
-        return `<div class="data-table glass-panel"><table><thead><tr><th>Başlık</th><th>Durum</th><th>Tarih</th><th>İşlem</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
-
-    getTeamHTML() {
-        const users = window.App.store.getUsers();
-        return `<div class="users-grid">${users.map(u => `<div class="user-card glass-panel"><h4>${u.name}</h4><p>${u.role}</p></div>`).join('')}</div>`;
+        return `<div class="data-table glass-panel"><table><thead><tr><th>Başlık</th><th>Durum</th><th>Bitiş</th><th>İşlem</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
 
     renderModal(title, html) {
         const container = document.getElementById('modal-container');
-        container.innerHTML = `<div class="modal-overlay"><div class="modal glass-panel"><h3>${title}</h3><div class="modal-body">${html}</div><button onclick="document.getElementById('modal-container').innerHTML=''" class="btn btn-outline">Kapat</button></div></div>`;
+        container.innerHTML = `<div class="modal-overlay"><div class="modal glass-panel"><div class="modal-header"><h3>${title}</h3><button onclick="document.getElementById('modal-container').innerHTML=''"><i class="ph ph-x"></i></button></div><div class="modal-body">${html}</div></div></div>`;
     }
 }
 
-// --- APP CONTROLLER ---
+// --- APP CONTROLLER (TAM VERSİYON) ---
 class Application {
     constructor() {
         this.store = new Store();
@@ -197,27 +198,20 @@ class Application {
     }
 
     async init() {
-        // 1. Önce buluttaki güncel verileri çek
-        await this.syncWithCloud();
-        
-        // 2. Diğer rutinler
         Utils.seedData();
+        await this.syncWithCloud(); // Açılışta buluttan çek
         this.checkAuth();
     }
 
     async syncWithCloud() {
-        console.log("Bulutla eşitleniyor...");
         try {
-            const response = await fetch(this.CLOUD_URL);
-            const data = await response.json();
-            if (data && Array.isArray(data)) {
-                this.store.saveTasks(data);
-                if (this.store.currentUser) this.view.updateView('tasks');
-                console.log("Senkronizasyon başarılı.");
+            const res = await fetch(this.CLOUD_URL);
+            const cloudData = await res.json();
+            if (cloudData && Array.isArray(cloudData)) {
+                this.store.saveTasks(cloudData);
+                if (this.store.currentUser) this.navigate('tasks');
             }
-        } catch (e) {
-            console.error("Veri çekilemedi:", e);
-        }
+        } catch (e) { console.log("Senkronizasyon atlandı."); }
     }
 
     async uploadToCloud() {
@@ -225,13 +219,10 @@ class Application {
             const tasks = this.store.getTasks();
             await fetch(this.CLOUD_URL, {
                 method: 'POST',
-                mode: 'no-cors', // Google Script CORS kısıtlaması için
+                mode: 'no-cors',
                 body: JSON.stringify({ items: tasks })
             });
-            console.log("Veriler buluta gönderildi.");
-        } catch (e) {
-            console.error("Yükleme hatası:", e);
-        }
+        } catch (e) { console.error("Buluta yüklenemedi."); }
     }
 
     checkAuth() {
@@ -241,7 +232,7 @@ class Application {
 
     handleLogin(u, p) {
         if (this.store.login(u, p)) this.checkAuth();
-        else alert("Hata!");
+        else alert("Hatalı giriş!");
     }
 
     handleLogout() {
@@ -258,37 +249,45 @@ class Application {
 
     openCreateTaskModal() {
         const html = `
-            <form id="task-form">
-                <input type="text" id="t-title" placeholder="Görev Başlığı" required style="width:100%; margin-bottom:10px; padding:8px;">
-                <input type="date" id="t-date" required style="width:100%; margin-bottom:10px; padding:8px;">
-                <button type="submit" class="btn btn-primary">Kaydet</button>
-            </form>
+            <div class="form-group">
+                <label>Görev Başlığı</label>
+                <input type="text" id="t-title" style="width:100%; padding:8px; margin-bottom:10px;">
+                <label>Bitiş Tarihi</label>
+                <input type="date" id="t-date" style="width:100%; padding:8px; margin-bottom:10px;">
+                <button onclick="App.confirmCreateTask()" class="btn btn-primary btn-block">Görev Ekle</button>
+            </div>
         `;
-        this.view.renderModal("Yeni Görev", html);
-        document.getElementById('task-form').onsubmit = (e) => {
-            e.preventDefault();
-            const tasks = this.store.getTasks();
-            tasks.push({
-                id: Utils.generateId(),
-                title: document.getElementById('t-title').value,
-                dueDate: document.getElementById('t-date').value,
-                status: 'pending'
-            });
-            this.store.saveTasks(tasks);
-            this.uploadToCloud(); // Buluta gönder
-            document.getElementById('modal-container').innerHTML = '';
-            this.view.updateView('tasks');
-        };
+        this.view.renderModal("Yeni Görev Oluştur", html);
+    }
+
+    confirmCreateTask() {
+        const title = document.getElementById('t-title').value;
+        const date = document.getElementById('t-date').value;
+        if (!title || !date) return alert("Eksik alan!");
+
+        const tasks = this.store.getTasks();
+        tasks.push({
+            id: Utils.generateId(),
+            title: title,
+            dueDate: date,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        });
+        
+        this.store.saveTasks(tasks);
+        this.uploadToCloud(); // Buluta gönder
+        document.getElementById('modal-container').innerHTML = '';
+        this.navigate('tasks');
     }
 
     deleteTask(id) {
+        if (!confirm("Silmek istediğine emin misin?")) return;
         let tasks = this.store.getTasks();
         tasks = tasks.filter(t => t.id !== id);
         this.store.saveTasks(tasks);
         this.uploadToCloud(); // Buluta gönder
-        this.view.updateView('tasks');
+        this.navigate('tasks');
     }
 }
 
-// Uygulamayı Başlat
 window.App = new Application();
