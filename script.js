@@ -167,15 +167,22 @@ const GoogleSheetService = {
             if (statusEl) statusEl.style.background = 'var(--warning)'; // Saving
 
             console.log('Saving to Cloud...', data);
+
+            // Note: We send as text/plain to avoid CORS pre-flight OPTIONS request
+            // which Google Apps Script doesn't support.
             await fetch(CONSTANTS.API_URL, {
                 method: 'POST',
+                mode: 'no-cors', // Apps Script usually redirects, no-cors avoids issues if you don't need the response body
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
                 body: JSON.stringify(data)
             });
-            console.log('Saved to Cloud');
+            console.log('Saved to Cloud (Note: no-cors mode might not confirm success body)');
 
             if (statusEl) {
                 statusEl.style.background = 'var(--success)';
-                statusEl.title = 'Kaydedildi';
+                statusEl.title = 'Kaydedildi (Pencereyi yenileyerek doğrulayabilirsiniz)';
             }
             return true;
         } catch (error) {
@@ -183,7 +190,7 @@ const GoogleSheetService = {
             const statusEl = document.getElementById('connection-status');
             if (statusEl) {
                 statusEl.style.background = 'var(--danger)';
-                statusEl.title = 'Kaydedilemedi (Çevrimdışı)';
+                statusEl.title = 'Kaydedilemedi (Çevrimdışı: ' + error.message + ')';
             }
             return false;
         }
@@ -304,7 +311,9 @@ class ViewManager {
                         <li onclick="App.navigate('reports')">
                             <i class="ph ph-chart-line-up"></i> <span>Raporlar</span>
                         </li>
-                        ` : ''}
+                        <li onclick="App.sync()">
+                            <i class="ph ph-arrows-clockwise"></i> <span>Verileri Yenile</span>
+                        </li>
                     </ul>
 
                         <div class="user-profile">
@@ -802,6 +811,17 @@ class Application {
         } else {
             alert('Hatalı kullanıcı adı veya şifre!');
         }
+    }
+
+    async sync() {
+        const statusEl = document.getElementById('connection-status');
+        if (statusEl) {
+            statusEl.style.background = 'var(--warning)';
+            statusEl.title = 'Senkronize ediliyor...';
+        }
+
+        await this.store.init();
+        this.navigate('home'); // Refresh current view
     }
 
     handleLogout() {
