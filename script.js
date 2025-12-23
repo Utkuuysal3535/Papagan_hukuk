@@ -8,6 +8,10 @@
  */
 
 // --- UTILS ---
+/**
+ * İş Takibi - Personel Yönetim Sistemi
+ * Version: 1.0.2 (Cache Bypass)
+ */
 const Utils = {
     generateId: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
 
@@ -1342,7 +1346,6 @@ class Application {
     }
 }
 
-// Initialize
 // Initialize
 window.App = new Application();
 window.App.init().catch(err => {
