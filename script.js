@@ -1323,14 +1323,6 @@ class Application {
 
 // Initialize
 // Initialize
-window.onerror = function (msg, url, line, col, error) {
-    const div = document.createElement('div');
-    div.style.cssText = 'position:fixed; top:0; left:0; right:0; background:red; color:white; padding:20px; z-index:9999; font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-    div.innerHTML = '<strong>Hata Oluştu:</strong> ' + msg + '<br><small>' + url + ':' + line + '</small><br><button onclick="this.parentElement.remove()" style="margin-top:10px; padding:5px 10px; color:black;">Kapat</button>';
-    document.body.appendChild(div);
-    return false;
-};
-
 window.App = new Application();
 window.App.init().catch(err => {
     console.error("Critical Init Error:", err);
