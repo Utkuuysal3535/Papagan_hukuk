@@ -210,6 +210,33 @@ const GoogleSheetService = {
             }
             return false;
         }
+    },
+
+    async log(action, taskTitle, details = {}) {
+        const user = window.App.store.currentUser;
+        const entry = {
+            type: 'LOG_ENTRY',
+            timestamp: Utils.getIstanbulDate().toLocaleString('tr-TR'),
+            user: user ? user.name : 'Sistem',
+            task: taskTitle,
+            action: action,
+            ...details
+        };
+
+        console.log('Logging to Sheet:', entry);
+
+        try {
+            await fetch(CONSTANTS.API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(entry)
+            });
+            return true;
+        } catch (error) {
+            console.error('Logging Failed:', error);
+            return false;
+        }
     }
 };
 
@@ -1071,6 +1098,14 @@ class Application {
             }
 
             this.store.saveTasks(tasks);
+
+            // Log the update
+            GoogleSheetService.log('DURUM GÜNCELLEME', task.title, {
+                durum: status.toUpperCase(),
+                not: note || '-',
+                sure: duration ? `${duration} dk` : '-'
+            });
+
             document.getElementById('modal-container').innerHTML = '';
             this.navigate('tasks');
 
@@ -1172,6 +1207,11 @@ class Application {
             });
             this.store.saveTasks(tasks);
 
+            // Log the note
+            GoogleSheetService.log('NOT EKLEME', task.title, {
+                not: text
+            });
+
             // Re-render modal to show new note
             this.openTaskDetails(taskId);
         }
@@ -1265,6 +1305,14 @@ class Application {
         }
 
         this.store.saveTasks(tasks);
+
+        // Log the creation
+        const users = this.store.getUsers();
+        GoogleSheetService.log('GÖREV OLUŞTURMA', data.title, {
+            adet: quantity,
+            atanan: users.find(u => u.id === data.assigneeId)?.name || 'Bilinmiyor',
+            tahminiSure: data.estimatedDuration || '-'
+        });
 
         // Notify Assignee
         if (data.assigneeId !== this.store.currentUser.id) {
