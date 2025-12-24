@@ -15,6 +15,18 @@
 const Utils = {
     generateId: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
 
+    getIstanbulDate: () => {
+        // Istanbul is UTC+3
+        const now = new Date();
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        return new Date(utc + (3600000 * 3));
+    },
+
+    formatDate: (date) => {
+        const d = date instanceof Date ? date : new Date(date);
+        return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    },
+
     // Mock Data Generator for first run
     seedData: () => {
         if (!localStorage.getItem('nex_users') || localStorage.getItem('nex_seed_version') !== '4') {
@@ -447,6 +459,7 @@ class ViewManager {
         const currentUser = window.App.store.currentUser;
         const isAdmin = ['admin', 'manager'].includes(currentUser.role);
         const activeTab = window.App.activeTaskTab || (isAdmin ? 'pending' : 'my_tasks');
+        const assigneeFilter = window.App.assigneeFilter || 'all';
 
         // Define Tabs based on Role
         let tabs = [];
@@ -469,8 +482,11 @@ class ViewManager {
 
         // Role & Tab Filter
         if (isAdmin) {
-            // Admin sees all, filtered by status tab
+            // Admin sees all, filtered by status tab and assignee filter
             tasks = tasks.filter(t => t.status === activeTab);
+            if (assigneeFilter !== 'all') {
+                tasks = tasks.filter(t => t.assigneeId === assigneeFilter);
+            }
         } else {
             // Employee view
             if (activeTab === 'my_tasks') {
@@ -528,8 +544,8 @@ class ViewManager {
                         (t.status === 'cancelled' ? 'İptal' : 'Tamamlandı'))}
                         </span>
                     </td>
-                    <td>${t.dueDate}</td>
-                    <td>${elapsedBadge}</td>
+                    <td>${Utils.formatDate(t.createdAt)}</td>
+                    <td>${t.completedAt ? Utils.formatDate(t.completedAt) : '-'}</td>
                     <td onclick="event.stopPropagation()">
                         <button class="btn-icon" title="Durum Güncelle" onclick="App.openStatusUpdateModal('${t.id}')">
                             <i class="ph ph-pencil-simple"></i>
@@ -549,8 +565,20 @@ class ViewManager {
         `).join('');
 
         return `
-            <div class="tabs-container" style="margin-bottom:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
-                ${tabsHtml}
+            <div class="tabs-container" style="margin-bottom:1.5rem; display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
+                <div style="display:flex; gap:0.5rem;">
+                    ${tabsHtml}
+                </div>
+                
+                ${isAdmin ? `
+                <div style="margin-left:auto; display:flex; align-items:center; gap:0.5rem;">
+                    <label style="font-size:0.9rem; color:var(--text-muted);">Personel:</label>
+                    <select onchange="App.setAssigneeFilter(this.value)" style="padding:0.5rem; border-radius:20px; background:rgba(255,255,255,0.05); color:white; border:1px solid var(--glass-border); font-size:0.9rem;">
+                        <option value="all" ${assigneeFilter === 'all' ? 'selected' : ''}>Tümü</option>
+                        ${users.map(u => `<option value="${u.id}" ${assigneeFilter === u.id ? 'selected' : ''}>${u.name}</option>`).join('')}
+                    </select>
+                </div>
+                ` : ''}
             </div>
 
             ${tasks.length === 0 ? `
@@ -566,8 +594,8 @@ class ViewManager {
                             <th>Başlık</th>
                             <th>Atanan</th>
                             <th>Durum</th>
-                            <th>Bitiş Tarihi</th>
-                            <th>Süreç</th>
+                            <th>Açılış Tarihi</th>
+                            <th>Kapanış Tarihi</th>
                             <th>İşlem</th>
                         </tr>
                     </thead>
@@ -753,6 +781,12 @@ class Application {
         this.store = new Store();
         this.view = new ViewManager('app');
         this.activeTaskTab = null; // State for Task Tabs
+        this.assigneeFilter = 'all'; // State for Assignee Filter
+    }
+
+    setAssigneeFilter(userId) {
+        this.assigneeFilter = userId;
+        this.navigate('tasks');
     }
 
     async init() {
@@ -809,10 +843,13 @@ class Application {
 
     checkRecurringTasks() {
         // Run daily Check
+        const now = Utils.getIstanbulDate();
+        const today = now.toISOString().split('T')[0];
         const lastRun = localStorage.getItem('nex_last_recur_run');
-        const today = new Date().toISOString().split('T')[0];
 
+        // Rule: Only run once per day, and only if it's 9:00 AM or later
         if (lastRun === today) return;
+        if (now.getHours() < 9) return;
 
         const tasks = this.store.getTasks();
         const recurringMasters = tasks.filter(t => t.isRecurring && !t.parentTaskId);
@@ -822,14 +859,19 @@ class Application {
             // Check if already exists for today
             const exists = tasks.find(t => t.parentTaskId === master.id && t.createdAt.startsWith(today));
             if (!exists) {
+                // Set creation time to 09:00:00.000 of today for consistency
+                const scheduledDate = new Date(now);
+                scheduledDate.setHours(9, 0, 0, 0);
+
                 const clone = {
                     ...master,
                     id: Utils.generateId(),
                     parentTaskId: master.id,
                     status: 'pending',
-                    createdAt: new Date().toISOString(),
-                    dueDate: today, // Recurring tasks usually for today
-                    notes: [] // Don't copy notes
+                    createdAt: scheduledDate.toISOString(),
+                    assignedAt: scheduledDate.toISOString(),
+                    dueDate: today,
+                    notes: []
                 };
                 newTasks.push(clone);
             }
@@ -1008,7 +1050,7 @@ class Application {
                         return;
                     }
                 }
-                task.completedAt = new Date().toISOString();
+                task.completedAt = Utils.getIstanbulDate().toISOString();
                 task.workDuration = duration;
             } else {
                 task.completedAt = null;
@@ -1071,6 +1113,12 @@ class Application {
                 </div>
                 <div class="detail-row">
                     <span class="label">Atanan:</span> <span class="val">${assignee}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Açılış:</span> <span class="val">${Utils.formatDate(task.createdAt)}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Kapanış:</span> <span class="val">${task.completedAt ? Utils.formatDate(task.completedAt) : '-'}</span>
                 </div>
                 
                 <div class="detail-row">
