@@ -682,7 +682,7 @@ class ViewManager {
             const typeRows = types.map(t => `
                 <div class="user-card glass-panel" style="position:relative; text-align:left; padding:1.5rem;">
                     <h4 style="margin:0;">${t.name}</h4>
-                    <p style="margin:0.5rem 0; color:var(--text-muted);">${t.duration} Dakika</p>
+                    <p style="margin:0.5rem 0; color:var(--text-muted);">${t.duration ? t.duration + ' Dakika' : 'Süresiz'}</p>
                     <div style="margin-top:1rem; display:flex; gap:0.5rem;">
                         <button class="btn-icon" style="background:var(--danger); width:32px; height:32px;" onclick="App.handleDeleteTaskType('${t.id}')"><i class="ph ph-trash"></i></button>
                     </div>
@@ -1359,7 +1359,7 @@ class Application {
                         </button>
                     ` : ''}
                 </div>
-                <select id="task-type-select" name="typeId" onchange="App.handleTaskTypeChange(this.value)" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; border-radius: 8px;">
+                <select id="task-type-select" name="typeId" required onchange="App.handleTaskTypeChange(this.value)" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; border-radius: 8px;">
                     ${typeOptions}
                 </select>
             </div>
@@ -1629,17 +1629,26 @@ class Application {
     }
 
     handleTaskTypeChange(typeId) {
-        if (!typeId) return;
         const types = this.store.getTaskTypes();
         const type = types.find(t => t.id === typeId);
+        const durationInput = document.getElementsByName('estimatedDuration')[0];
+        const isEmployee = this.store.currentUser.role === 'employee';
+
         if (type) {
-            const durationInput = document.getElementsByName('estimatedDuration')[0];
-            if (durationInput) durationInput.value = type.duration;
+            if (durationInput) {
+                durationInput.value = type.duration || '';
+                if (isEmployee) durationInput.readOnly = true;
+            }
 
             // Auto-set title if empty
             const titleInput = document.getElementById('task-title');
             if (titleInput && !titleInput.value) {
                 titleInput.value = type.name;
+            }
+        } else {
+            // No type selected or selection cleared
+            if (durationInput && isEmployee) {
+                durationInput.readOnly = false;
             }
         }
     }
@@ -1652,8 +1661,8 @@ class Application {
                     <input type="text" name="name" required placeholder="Örn: Müşteri Görüşmesi">
                 </div>
                 <div class="form-group">
-                    <label>Tahmini Süre (Dakika)</label>
-                    <input type="number" name="duration" required placeholder="Örn: 45">
+                    <label>Tahmini Süre (Dakika) - Opsiyonel</label>
+                    <input type="number" name="duration" placeholder="Boş bırakılabilir">
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">Kaydet</button>
             </form>
