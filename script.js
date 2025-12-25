@@ -557,24 +557,19 @@ class ViewManager {
 
         const rows = tasks.map(t => {
             const assignee = users.find(u => u.id === t.assigneeId)?.name || 'Bilinmiyor';
-            const isCompleted = t.status === 'completed';
+            const taskTypes = window.App.store.getTaskTypes();
+            const taskTypeName = taskTypes.find(type => type.id === t.typeId)?.name || '-';
             const recurBadge = t.isRecurring ? '<i class="ph ph-arrows-clockwise" title="Tekrarlayan Görev" style="color:var(--warning); margin-right:4px;"></i>' : '';
-
-            // Elapsed Time Badge
-            let elapsedBadge = '';
-            if (t.status !== 'cancelled') {
-                const label = isCompleted ? 'Tamamlanan' : 'Geçen';
-                elapsedBadge = `<span class="badge" style="background:rgba(255,255,255,0.1); border:1px solid var(--glass-border);">${label}: ${getElapsed(t)}</span>`;
-            }
 
             return `
                 <tr class="task-row" onclick="App.openTaskDetails('${t.id}')" style="cursor:pointer">
                     <td>
                         <div style="display:flex; align-items:center;">
                             ${recurBadge}
-                            <span>${t.title}</span>
+                            <span>${t.subject || t.title}</span>
                         </div>
                     </td>
+                    <td>${taskTypeName}</td>
                     <td>${assignee}</td>
                     <td>
                         <span class="badge ${t.status}">
@@ -583,6 +578,7 @@ class ViewManager {
                         (t.status === 'cancelled' ? 'İptal' : 'Tamamlandı'))}
                         </span>
                     </td>
+                    <td>${t.estimatedDuration ? t.estimatedDuration + ' dk' : '-'}</td>
                     <td>${Utils.formatDate(t.createdAt)}</td>
                     <td>${t.completedAt ? Utils.formatDate(t.completedAt) : '-'}</td>
                     <td onclick="event.stopPropagation()">
@@ -630,9 +626,11 @@ class ViewManager {
                 <table>
                     <thead>
                         <tr>
-                            <th>Başlık</th>
+                            <th>Konu</th>
+                            <th>Dosya Türü</th>
                             <th>Atanan</th>
                             <th>Durum</th>
+                            <th>Tahm. Süre</th>
                             <th>Açılış Tarihi</th>
                             <th>Kapanış Tarihi</th>
                             <th>İşlem</th>
