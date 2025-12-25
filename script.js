@@ -262,6 +262,15 @@ class Store {
         localStorage.setItem('nex_notifications', JSON.stringify(notes));
     }
 
+    getTaskTypes() {
+        return JSON.parse(localStorage.getItem('nex_task_types')) || [];
+    }
+
+    saveTaskTypes(types) {
+        localStorage.setItem('nex_task_types', JSON.stringify(types));
+        this.syncToCloud();
+    }
+
     saveTasks(tasks) {
         localStorage.setItem('nex_tasks', JSON.stringify(tasks));
         this.syncToCloud();
@@ -293,11 +302,13 @@ class Store {
             // Assume object { users: [], tasks: [] }
             const tasksChanged = JSON.stringify(cloudData.tasks) !== localStorage.getItem('nex_tasks');
             const usersChanged = JSON.stringify(cloudData.users) !== localStorage.getItem('nex_users');
+            const typesChanged = JSON.stringify(cloudData.taskTypes) !== localStorage.getItem('nex_task_types');
 
             if (usersChanged && cloudData.users) localStorage.setItem('nex_users', JSON.stringify(cloudData.users));
             if (tasksChanged && cloudData.tasks) localStorage.setItem('nex_tasks', JSON.stringify(cloudData.tasks));
+            if (typesChanged && cloudData.taskTypes) localStorage.setItem('nex_task_types', JSON.stringify(cloudData.taskTypes));
 
-            return { tasksChanged, usersChanged };
+            return { tasksChanged, usersChanged, typesChanged };
         } else if (Array.isArray(cloudData) && cloudData.length === 0) {
             // First time or empty
             console.log('Cloud is empty, pushing local data...');
@@ -309,7 +320,8 @@ class Store {
     syncToCloud() {
         const data = {
             users: this.getUsers(),
-            tasks: this.getTasks()
+            tasks: this.getTasks(),
+            taskTypes: this.getTaskTypes()
         };
         GoogleSheetService.save(data);
     }
@@ -440,7 +452,7 @@ class ViewManager {
             contentEl.innerHTML = this.getTasksViewHTML();
         } else if (viewName === 'team') {
             titleEl.textContent = 'Ekip Yönetimi';
-            contentEl.innerHTML = this.getTeamViewHTML();
+            contentEl.innerHTML = this.getTeamViewHTML(params.tab || 'personnel');
         } else if (viewName === 'reports') {
             titleEl.textContent = 'Performans Raporları';
             contentEl.innerHTML = this.getReportsViewHTML(params);
@@ -633,7 +645,7 @@ class ViewManager {
         `;
     }
 
-    getTeamViewHTML() {
+    getTeamViewHTML(activeTab = 'personnel') {
         const users = window.App.store.getUsers();
         const tasks = window.App.store.getTasks();
         const currentUser = window.App.store.currentUser;
@@ -665,7 +677,37 @@ class ViewManager {
             `;
         }).join('');
 
+        if (activeTab === 'types') {
+            const types = window.App.store.getTaskTypes();
+            const typeRows = types.map(t => `
+                <div class="user-card glass-panel" style="position:relative; text-align:left; padding:1.5rem;">
+                    <h4 style="margin:0;">${t.name}</h4>
+                    <p style="margin:0.5rem 0; color:var(--text-muted);">${t.duration} Dakika</p>
+                    <div style="margin-top:1rem; display:flex; gap:0.5rem;">
+                        <button class="btn-icon" style="background:var(--danger); width:32px; height:32px;" onclick="App.handleDeleteTaskType('${t.id}')"><i class="ph ph-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="tabs-container" style="margin-bottom:1.5rem; display:flex; gap:1rem;">
+                    <button onclick="App.navigate('team', {tab:'personnel'})" class="btn btn-outline" style="border-radius:20px;">Personel Listesi</button>
+                    <button onclick="App.navigate('team', {tab:'types'})" class="btn btn-primary" style="border-radius:20px;">Görev Tipleri</button>
+                </div>
+                <div style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
+                     <button onclick="App.openAddTaskTypeModal()" class="btn btn-primary"><i class="ph ph-plus"></i> Yeni Görev Tipi</button>
+                </div>
+                <div class="users-grid">
+                    ${typeRows || '<p style="grid-column: 1/-1; text-align:center; padding:2rem; opacity:0.5;">Henüz görev tipi tanımlanmamış.</p>'}
+                </div>
+            `;
+        }
+
         return `
+            <div class="tabs-container" style="margin-bottom:1.5rem; display:flex; gap:1rem;">
+                <button onclick="App.navigate('team', {tab:'personnel'})" class="btn btn-primary" style="border-radius:20px;">Personel Listesi</button>
+                <button onclick="App.navigate('team', {tab:'types'})" class="btn btn-outline" style="border-radius:20px;">Görev Tipleri</button>
+            </div>
             <div style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
                  <button onclick="App.openAddUserModal()" class="btn btn-primary"><i class="ph ph-user-plus"></i> Yeni Personel</button>
             </div>
@@ -1183,6 +1225,8 @@ class Application {
 
         const creator = users.find(u => u.id === task.creatorId)?.name || 'Bilinmiyor';
         const assignee = users.find(u => u.id === task.assigneeId)?.name || 'Bilinmiyor';
+        const taskTypes = this.store.getTaskTypes();
+        const taskType = taskTypes.find(t => t.id === task.typeId)?.name || '-';
 
         const canEdit = ['admin', 'manager'].includes(this.store.currentUser.role);
 
@@ -1203,6 +1247,12 @@ class Application {
 
         const content = `
             <div class="task-details">
+                <div class="detail-row">
+                    <span class="label">Konu:</span> <span class="val">${task.subject || '-'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Görev Türü:</span> <span class="val">${taskType}</span>
+                </div>
                 <div class="detail-row">
                     <span class="label">Oluşturan:</span> <span class="val">${creator}</span>
                 </div>
@@ -1282,6 +1332,9 @@ class Application {
         const canAssign = ['admin', 'manager'].includes(currentUser.role);
         const users = this.store.getUsers();
 
+        const taskTypes = this.store.getTaskTypes();
+        const typeOptions = `<option value="">Görev Tipi Seçiniz</option>` + taskTypes.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
         let userOptions = '';
         if (canAssign) {
             userOptions = users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
@@ -1292,8 +1345,20 @@ class Application {
         const content = `
             <form onsubmit="App.handleCreateTask(event)">
             <div class="form-group">
+                <label>Konu</label>
+                <input type="text" id="task-subject" name="subject" required placeholder="İşin konusu nedir?">
+            </div>
+
+            <div class="form-group">
+                <label>Görev Türü</label>
+                <select id="task-type-select" name="typeId" onchange="App.handleTaskTypeChange(this.value)" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; border-radius: 8px;">
+                    ${typeOptions}
+                </select>
+            </div>
+
+            <div class="form-group">
                 <label>Görev Başlığı</label>
-                <input type="text" name="title" required placeholder="Görev nedir?">
+                <input type="text" id="task-title" name="title" required placeholder="Açıklayıcı başlık...">
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -1349,6 +1414,8 @@ class Application {
             const newTask = {
                 id: Utils.generateId(),
                 title: data.title + titleSuffix,
+                subject: data.subject || '',
+                typeId: data.typeId || '',
                 description: data.description,
                 assigneeId: data.assigneeId,
                 dueDate: data.dueDate,
@@ -1551,6 +1618,64 @@ class Application {
 
         document.getElementById('modal-container').innerHTML = '';
         this.navigate('team');
+    }
+
+    handleTaskTypeChange(typeId) {
+        if (!typeId) return;
+        const types = this.store.getTaskTypes();
+        const type = types.find(t => t.id === typeId);
+        if (type) {
+            const durationInput = document.getElementsByName('estimatedDuration')[0];
+            if (durationInput) durationInput.value = type.duration;
+
+            // Auto-set title if empty
+            const titleInput = document.getElementById('task-title');
+            if (titleInput && !titleInput.value) {
+                titleInput.value = type.name;
+            }
+        }
+    }
+
+    openAddTaskTypeModal() {
+        const content = `
+            <form onsubmit="App.handleAddTaskType(event)">
+                <div class="form-group">
+                    <label>Görev Tipi Adı</label>
+                    <input type="text" name="name" required placeholder="Örn: Müşteri Görüşmesi">
+                </div>
+                <div class="form-group">
+                    <label>Tahmini Süre (Dakika)</label>
+                    <input type="number" name="duration" required placeholder="Örn: 45">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Kaydet</button>
+            </form>
+        `;
+        this.view.renderModal('Yeni Görev Tipi', content);
+    }
+
+    handleAddTaskType(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const data = Object.fromEntries(fd.entries());
+
+        const types = this.store.getTaskTypes();
+        types.push({
+            id: Utils.generateId(),
+            name: data.name,
+            duration: parseInt(data.duration) || 0
+        });
+
+        this.store.saveTaskTypes(types);
+        document.getElementById('modal-container').innerHTML = '';
+        this.navigate('team', { tab: 'types' });
+    }
+
+    handleDeleteTaskType(typeId) {
+        if (!confirm('Bu görev tipini silmek istediğinize emin misiniz?')) return;
+        let types = this.store.getTaskTypes();
+        types = types.filter(t => t.id !== typeId);
+        this.store.saveTaskTypes(types);
+        this.navigate('team', { tab: 'types' });
     }
 }
 
