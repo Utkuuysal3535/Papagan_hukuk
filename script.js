@@ -1006,6 +1006,16 @@ class Application {
                     </select>
                 </div>
 
+                <div id="transfer-group" class="form-group" style="display:none">
+                    <label>Kime Devret? (Opsiyonel Takip İşi)</label>
+                    <select id="transfer-assignee" style="width:100%; padding:0.75rem; border-radius:8px; background:rgba(255,255,255,0.05); color:white; border:1px solid var(--glass-border);">
+                        <option value="">Seçilmedi (Bitir)</option>
+                        ${window.App.store.getUsers()
+                .filter(u => u.id !== this.store.currentUser.id)
+                .map(u => `<option value="${u.id}">${u.name}</option>`).join('')}
+                    </select>
+                </div>
+
                 <div id="duration-group" class="form-group" style="${isCompleted ? 'display:block' : 'display:none'}">
                     <label>Harcanan Süre (Dakika)</label>
                     <input type="number" id="input-duration" placeholder="Örn: ${est}" value="${task.workDuration || est}">
@@ -1027,18 +1037,22 @@ class Application {
         const durGroup = document.getElementById('duration-group');
         const noteGroup = document.getElementById('note-group');
         const noteLabel = document.getElementById('note-label');
+        const transferGroup = document.getElementById('transfer-group');
 
         if (status === 'completed') {
             durGroup.style.display = 'block';
             noteGroup.style.display = 'block';
+            transferGroup.style.display = 'block';
             noteLabel.textContent = 'Açıklama / Not (Opsiyonel)';
         } else if (status === 'postponed' || status === 'cancelled') {
             durGroup.style.display = 'none';
             noteGroup.style.display = 'block';
+            transferGroup.style.display = 'none';
             noteLabel.textContent = 'Açıklama (Zorunlu)';
         } else {
             durGroup.style.display = 'none';
             noteGroup.style.display = 'none';
+            transferGroup.style.display = 'none';
         }
     }
 
@@ -1053,6 +1067,7 @@ class Application {
             const status = statusFn.value;
             const duration = parseInt(durFn.value || '0');
             const note = (noteFn.value || '').trim();
+            const transferAssigneeId = document.getElementById('transfer-assignee')?.value;
 
             const tasks = this.store.getTasks();
             const task = tasks.find(t => t.id === taskId);
@@ -1098,6 +1113,40 @@ class Application {
             }
 
             this.store.saveTasks(tasks);
+
+            // Handle Task Transfer (Forwarding)
+            if (status === 'completed' && transferAssigneeId) {
+                const followUpTask = {
+                    id: Utils.generateId(),
+                    title: `Takip: ${task.title}`,
+                    description: `Devredilen iş. Önceki notlar: ${note || 'Yok'}`,
+                    assigneeId: transferAssigneeId,
+                    dueDate: task.dueDate,
+                    isRecurring: false,
+                    estimatedDuration: task.estimatedDuration,
+                    status: 'pending',
+                    creatorId: this.store.currentUser.id,
+                    createdAt: Utils.getIstanbulDate().toISOString(),
+                    assignedAt: Utils.getIstanbulDate().toISOString(),
+                    parentTaskId: task.id,
+                    notes: [{
+                        userId: this.store.currentUser.id,
+                        text: `İş devredildi. Önceki süreci başlatan not: ${note || '-'}`,
+                        time: Utils.getIstanbulDate().toISOString()
+                    }]
+                };
+
+                // Add followUpTask to tasks through store save
+                const allTasks = this.store.getTasks();
+                allTasks.push(followUpTask);
+                this.store.saveTasks(allTasks);
+
+                // Log the transfer
+                GoogleSheetService.log('İŞ DEVRETME', task.title, {
+                    atanan: window.App.store.getUsers().find(u => u.id === transferAssigneeId)?.name || 'Bilinmiyor',
+                    not: note || '-'
+                });
+            }
 
             // Log the update
             GoogleSheetService.log('DURUM GÜNCELLEME', task.title, {
