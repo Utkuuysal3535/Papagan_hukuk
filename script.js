@@ -1112,7 +1112,6 @@ class Application {
                 });
             }
 
-            this.store.saveTasks(tasks);
 
             // Handle Task Transfer (Forwarding)
             if (status === 'completed' && transferAssigneeId) {
@@ -1136,10 +1135,20 @@ class Application {
                     }]
                 };
 
-                // Add followUpTask to tasks through store save
-                const allTasks = this.store.getTasks();
-                allTasks.push(followUpTask);
-                this.store.saveTasks(allTasks);
+                // Add followUpTask to tasks through local tasks array
+                tasks.push(followUpTask);
+
+                // Notify Recipient
+                const notifs = this.store.getNotifications();
+                notifs.push({
+                    id: Utils.generateId(),
+                    userId: transferAssigneeId,
+                    title: 'Yeni Takip Görevi',
+                    message: `${this.store.currentUser.name} size bir iş devretti: ${task.title}`,
+                    read: false,
+                    createdAt: Utils.getIstanbulDate().toISOString()
+                });
+                this.store.saveNotifications(notifs);
 
                 // Log the transfer
                 GoogleSheetService.log('İŞ DEVRETME', task.title, {
