@@ -1157,6 +1157,8 @@ class Application {
                 });
             }
 
+            this.store.saveTasks(tasks);
+
             // Log the update
             GoogleSheetService.log('DURUM GÜNCELLEME', task.title, {
                 durum: status.toUpperCase(),
