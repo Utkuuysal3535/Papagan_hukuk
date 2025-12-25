@@ -627,7 +627,7 @@ class ViewManager {
                     <thead>
                         <tr>
                             <th>Konu</th>
-                            <th>Dosya Türü</th>
+                            <th>Görev Türü</th>
                             <th>Atanan</th>
                             <th>Durum</th>
                             <th>Tahm. Süre</th>
@@ -1362,11 +1362,6 @@ class Application {
                 </select>
             </div>
 
-            <div class="form-group">
-                <label>Görev Başlığı</label>
-                <input type="text" id="task-title" name="title" required placeholder="Açıklayıcı başlık...">
-            </div>
-            
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
                     <label>Adet (Toplu Oluştur)</label>
@@ -1419,7 +1414,7 @@ class Application {
             const titleSuffix = quantity > 1 ? ` #${i + 1} ` : '';
             const newTask = {
                 id: Utils.generateId(),
-                title: data.title + titleSuffix,
+                title: data.subject + titleSuffix,
                 subject: data.subject || '',
                 typeId: data.typeId || '',
                 description: data.description,
