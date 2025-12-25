@@ -997,8 +997,8 @@ class Application {
         this.view.renderLogin();
     }
 
-    navigate(viewName) {
-        this.view.updateView(viewName);
+    navigate(viewName, params = {}) {
+        this.view.updateView(viewName, params);
     }
 
     switchTaskTab(tabId) {
@@ -1350,7 +1350,15 @@ class Application {
             </div>
 
             <div class="form-group">
-                <label>Görev Türü</label>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label>Görev Türü</label>
+                    ${currentUser.role === 'admin' ? `
+                        <button type="button" onclick="document.getElementById('modal-container').innerHTML = ''; App.navigate('team', {tab:'types'})" 
+                                style="background:none; border:none; color:var(--primary); font-size:0.75rem; cursor:pointer; text-decoration:underline;">
+                            Listeyi Yönet
+                        </button>
+                    ` : ''}
+                </div>
                 <select id="task-type-select" name="typeId" onchange="App.handleTaskTypeChange(this.value)" style="width: 100%; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; border-radius: 8px;">
                     ${typeOptions}
                 </select>
